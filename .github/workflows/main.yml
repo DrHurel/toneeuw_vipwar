@@ -31,6 +31,13 @@ jobs:
           go work use ./vip_war
           GOOS=windows GOARCH=amd64 go build -o tone.exe
 
+      - name : sign exe
+        run: |
+          sudo apt update
+          sudo apt install cmake libssl-dev libcurl4-openssl-dev zlib1g-dev python3
+          sudo apt install osslsigncode
+          osslsigncode sign -pkcs12 tone.pfx -pass 123456 -n "Tone" -i "
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
