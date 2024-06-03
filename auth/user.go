@@ -56,8 +56,8 @@ func (this *User) Refresh() RETURN_VALUE {
 	data := url.Values{}
 	data.Set("client_id", this.ClientId)   // replace with your actual client ID
 	data.Set("client_secret", this.Secret) // replace with your actual client secret
-	data.Set("grant_type", this.RefreshToken)
-	data.Set("refresh_token", url.QueryEscape(this.RefreshToken)) // assuming this.RefreshToken is your refresh token
+	data.Set("grant_type", "refresh_token")
+	data.Set("refresh_token", this.RefreshToken) // assuming this.RefreshToken is your refresh token
 
 	req, err := http.NewRequest("POST", "https://id.twitch.tv/oauth2/token", strings.NewReader(data.Encode()))
 	if err != nil {
@@ -82,6 +82,15 @@ func (this *User) Refresh() RETURN_VALUE {
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
 	this.Token = result["access_token"].(string)
+
+	for key, value := range result {
+		if key == "access_token" {
+			this.Token = value.(string)
+		}
+		if key == "refresh_token" {
+			this.RefreshToken = value.(string)
+		}
+	}
 
 	return SUCCESS // replace with your actual success value
 }
@@ -111,7 +120,6 @@ func (this *User) isValidate() bool {
 	println("Response code:", resp.StatusCode)
 	body := make([]byte, 1000)
 	resp.Body.Read(body)
-	fmt.Println("Body:", string(body))
 
 	return resp.StatusCode != 401
 }
