@@ -33,16 +33,16 @@ jobs:
 
       - name : sign exe
         run: |
-          sudo apt update
-          sudo apt install cmake libssl-dev libcurl4-openssl-dev zlib1g-dev python3
-          sudo apt install osslsigncode
-          osslsigncode sign -pkcs12 tone.pfx -pass 123456 -n "Tone" -i "
+            sudo apt update
+            sudo apt install cmake libssl-dev libcurl4-openssl-dev zlib1g-dev python3
+            sudo apt install osslsigncode
+            osslsigncode sign -pkcs12 tone.pfx -pass 123456 -n "Tone" -i "https://tone.com" -t "http://timestamp.digicert.com" -in tone.exe -out tone_signed.exe
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
             files: |
-              tone.exe
+              tone_signed.exe
             
             tag_name: v0
         env:
