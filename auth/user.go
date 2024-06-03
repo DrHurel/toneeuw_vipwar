@@ -2,14 +2,14 @@ package auth
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os/exec"
-	"strconv"
 	"strings"
-	"time"
+	"utils"
 )
 
 type RETURN_VALUE int
@@ -27,38 +27,25 @@ type User struct {
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    string `json:"expires_in"`
+	Secret       string `json:"secret"`
 }
 
 func (this *User) Credentials() RETURN_VALUE {
-	timeVal := strings.Split(this.ExpiresIn, " ")
-	var tDate []int
-	temp := strings.Split(timeVal[0], "-")
-	for _, t := range temp {
-		tInt, _ := strconv.Atoi(t)
-		tDate = append(tDate, tInt)
-	}
-	var tTime []int
-
-	for _, t := range strings.Split(timeVal[1], ":") {
-		tInt, _ := strconv.Atoi(t)
-		tTime = append(tTime, tInt)
-	}
-
-	t := time.Date(tDate[0], time.Month(tDate[1]), tDate[2], tTime[0], tTime[1], tTime[2], 0, time.Local)
-
-	if t.Before(time.Now()) {
-
+	if this.ExpiresIn == "" {
 		shouldReturn, returnValue := this.FetchToken()
 		if shouldReturn {
 			return returnValue
 		}
+
+	}
+
+	if this.isValidate() {
+		println("\n=== Token is valid ===\n")
+
+		return SUCCESS
 	} else {
-		// Create the HTTP request
-		// refresh token
-		if this.isValidate() {
-			return SUCCESS
-		} else {
-			return this.Refresh()
+		if this.Refresh() == FAILED {
+			this.FetchToken()
 		}
 	}
 
@@ -66,11 +53,42 @@ func (this *User) Credentials() RETURN_VALUE {
 }
 
 func (this *User) Refresh() RETURN_VALUE {
-	return SUCCESS
+	data := url.Values{}
+	data.Set("client_id", this.ClientId)   // replace with your actual client ID
+	data.Set("client_secret", this.Secret) // replace with your actual client secret
+	data.Set("grant_type", this.RefreshToken)
+	data.Set("refresh_token", url.QueryEscape(this.RefreshToken)) // assuming this.RefreshToken is your refresh token
+
+	req, err := http.NewRequest("POST", "https://id.twitch.tv/oauth2/token", strings.NewReader(data.Encode()))
+	if err != nil {
+		fmt.Println("Error creating request:", err)
+		return FAILED // replace with your actual error value
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println("Error sending request:", err)
+		return FAILED // replace with your actual error value
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Error refreshing token:", resp.StatusCode)
+		return FAILED // replace with your actual error value
+	}
+
+	// Parse the response body to get the new access token
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	this.Token = result["access_token"].(string)
+
+	return SUCCESS // replace with your actual success value
 }
 
 func (this *User) isValidate() bool {
-	baseURL, err := url.Parse("https://api.twitch.tv/helix/channel_points/custom_rewards")
+	println("Checking if token is valid")
+	baseURL, err := url.Parse("https://id.twitch.tv/oauth2/validate")
 	if err != nil {
 		fmt.Println("Error parsing URL:", err)
 		return false
@@ -82,7 +100,7 @@ func (this *User) isValidate() bool {
 		return false
 	}
 
-	req.Header.Set("Authorization", "OAuth "+this.Token)
+	req.Header.Set(utils.AuthHeader, "OAuth "+this.Token) // remove the extra space after "OAuth"
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -90,11 +108,16 @@ func (this *User) isValidate() bool {
 		return false
 	}
 
+	println("Response code:", resp.StatusCode)
+	body := make([]byte, 1000)
+	resp.Body.Read(body)
+	fmt.Println("Body:", string(body))
+
 	return resp.StatusCode != 401
 }
 
 func (this *User) FetchToken() (bool, RETURN_VALUE) {
-	cmd := exec.Command("twitch", "token", "-u", "-s", "channel:read:redemptions")
+	cmd := exec.Command("twitch", "token", "-u", "-s", "channel:manage:redemptions channel:manage:vips")
 
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb
