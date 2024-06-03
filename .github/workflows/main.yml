@@ -1,0 +1,40 @@
+name: "Build & Release"
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  build_release:
+    name: Setup & Cache
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.25'
+
+      - name: Go work
+        run: |
+          go work init
+          go work use .
+          go work use ./auth
+          go work use ./cache
+          go work use ./vip_wars
+          GOOS=windows GOARCH=amd64 go build -o tone.exe
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+            files: |
+              tone.exe
+            
+            tag_name: v0
+       
