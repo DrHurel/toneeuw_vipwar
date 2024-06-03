@@ -27,6 +27,7 @@ jobs:
           go work use .
           go work use ./auth
           go work use ./cache
+          go work use ./utils
           go work use ./vip_war
           GOOS=windows GOARCH=amd64 go build -o tone.exe
 
